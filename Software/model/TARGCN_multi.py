@@ -10,7 +10,7 @@ import copy
 class TimeEncode(torch.nn.Module):
     def __init__(self, expand_dim, entity_specific=False, num_entities=None, device='cpu'):
         super(TimeEncode, self).__init__()
-        self.time_dim = expand_dim
+        self.time_dim = expand_dim  #300
         self.entity_specific = entity_specific
 
         if entity_specific:
@@ -20,7 +20,7 @@ class TimeEncode(torch.nn.Module):
             self.phase = torch.nn.Parameter(torch.zeros(self.time_dim).float().unsqueeze(dim=0).repeat(num_entities, 1))
         else:
             self.basis_freq = torch.nn.Parameter(
-                torch.from_numpy(1 / 10 ** np.linspace(0, 9, self.time_dim)).float())  # shape: num_entities * time_dim
+                torch.from_numpy(1 / 10 ** np.linspace(0, 9, self.time_dim)).float()) #300 ptu tu 1->1/1e9  # shape: num_entities * time_dim
             self.phase = torch.nn.Parameter(torch.zeros(self.time_dim).float())
 
     def forward(self, ts, entities=None):
@@ -42,7 +42,7 @@ class TARGCN(nn.Module):
     def __init__(self, neighbor_finder, embed_dim, num_ent, num_rel, logger, decoder, steps=2, device='cpu'):
         super(TARGCN, self).__init__()
         self.device = device
-        self.nf = neighbor_finder
+        self.nf = neighbor_finder   # class neighborFinder
         self.embed_dim = embed_dim
         self.pad_idx = num_ent + num_rel
         num_symbols = num_ent + num_rel
@@ -59,8 +59,8 @@ class TARGCN(nn.Module):
         if decoder.lower() == 'distmult':
             self.symbol_emb = nn.Embedding(num_symbols + 1, embed_dim, padding_idx=num_symbols).to(self.device)
 
-            self.gcn_w = nn.Linear(2 * self.embed_dim, self.embed_dim)
-            self.gcn_b = nn.Parameter(torch.FloatTensor(self.embed_dim))
+            self.gcn_w = nn.Linear(2 * self.embed_dim, self.embed_dim)          
+            self.gcn_b = nn.Parameter(torch.FloatTensor(self.embed_dim))       
             if self.use_time_embedding:
                 self.node_emb_proj = nn.Linear(2 * embed_dim, embed_dim)
                 self.time_encoder = TimeEncode(expand_dim=embed_dim, entity_specific=False,
@@ -91,15 +91,15 @@ class TARGCN(nn.Module):
 
     def find_temporal_neighbor(self, search_idx_all, ts_idx_all, offset_all, got_node_emb_all, neighbors,
                                num_neighbors):
-        search_idx_l = search_idx_all[-1]
-        ts_idx_l = ts_idx_all[-1]
+        search_idx_l = search_idx_all[-1]       # search_idx_all là array.len()=1, gồm all subjects
+        ts_idx_l = ts_idx_all[-1]               # timestamp
 
         out_ngh_node_batch, out_ngh_eidx_batch, out_ngh_t_batch, offset_l, got_node_emb_l = \
             self.nf.get_temporal_neighbor(search_idx_l, ts_idx_l, num_neighbors=num_neighbors)
 
-        mask = out_ngh_node_batch.flatten() != -1
+        mask = out_ngh_node_batch.flatten() != -1       #mask (12800,) True, False
         neighbors.append([out_ngh_node_batch, out_ngh_eidx_batch, out_ngh_t_batch])
-        search_idx_all.append(out_ngh_node_batch.flatten()[mask])
+        search_idx_all.append(out_ngh_node_batch.flatten()[mask])       # 2 phần tử, 1 là subject of batch, 2 là neighbors của từng subjects đó
         ts_idx_all.append(out_ngh_t_batch.flatten()[mask])
         offset_all.append(offset_l)
         got_node_emb_all.append(got_node_emb_l)
@@ -114,16 +114,22 @@ class TARGCN(nn.Module):
 
     def get_rel_emb(self, rel_idx_l):
         if self.decoder.lower() == 'distmult':
-            return self.symbol_emb(torch.from_numpy(rel_idx_l + self.num_ent).long().to(self.device))
+            return self.symbol_emb(torch.from_numpy(rel_idx_l + self.num_ent).long().to(self.device))       # ? + num_ent
         elif self.decoder.lower() == 'bique':
             return self.rel_emb_bi(torch.from_numpy(rel_idx_l).long().to(self.device))
 
-    def get_node_emb(self, ngh_idx_l, ngh_time_l, former_ts_idx):
-        hidden_node = self.get_ent_emb(ngh_idx_l)
-        if self.use_time_embedding:
+    def get_node_emb(self, ngh_idx_l, ngh_time_l, former_ts_idx): #self.get_node_emb(neighbors_latest[0][i][mask], neighbors_latest[2][i][mask], [ts_idx_all[-2][i]] * len(neighbors_latest[0][i][mask]))
+        hidden_node = self.get_ent_emb(ngh_idx_l)       # dùng distmult                                 #size (49,300)
+        if self.use_time_embedding:                         #    self.get_node_emb(np.arange(self.num_ent), np.zeros((self.num_ent,)).astype(np.int32), np.zeros((self.num_ent,)).astype(np.int32))
             cut_time_l = ngh_time_l - former_ts_idx
-            hidden_time = self.time_encoder(torch.from_numpy(cut_time_l[:, np.newaxis]).to(self.device))
-            return self.node_emb_proj(torch.cat([hidden_node, torch.squeeze(hidden_time, 1)], axis=1))
+            hidden_time = self.time_encoder(torch.from_numpy(cut_time_l[:, np.newaxis]).to(self.device)) #size (49, 1, 300)
+            # return self.node_emb_proj(torch.cat([hidden_node, torch.squeeze(hidden_time, 1)], axis=1))
+            # if (torch.cat([hidden_node, torch.squeeze(hidden_time, 1)], axis=1)).dtype == torch.double:
+            #     print('DOUBLE!')
+            #     print(hidden_node)
+            #     print(torch.squeeze(hidden_time, 1))
+            # else: print((torch.cat([hidden_node, torch.squeeze(hidden_time, 1)], axis=1)).dtype )
+            return self.node_emb_proj(torch.cat([hidden_node, torch.squeeze(hidden_time, 1)], axis=1))  # (...) có size (49,600)
         else:
             return self.node_emb_proj(hidden_node)
 
@@ -135,7 +141,7 @@ class TARGCN(nn.Module):
         return out.tanh()
 
     def forward(self, batch, num_neighbors=20):
-        search_idx_all = [batch.src_idx]
+        search_idx_all = [batch.src_idx]    #subject
         rel_idx_all = [batch.rel_idx]
         ts_idx_all = [batch.ts]
         offset_all = []
@@ -149,10 +155,10 @@ class TARGCN(nn.Module):
                                             num_neighbors)
 
         # initialize node emb of the latest found neighbors
-        neighbors_latest = neighbors[-1]
+        neighbors_latest = neighbors[-1]        # lấy ra neighbors của step cuối; neighbors có số lượng ele là = #n_step, mỗi ele=[sub, rel, time]
         ngh_emb, ngh_rel_emb = [], []
         ngh_emb_cur, ngh_rel_emb_cur = [], []
-        for i, ngh_l in enumerate(neighbors_latest[0]):
+        for i, ngh_l in enumerate(neighbors_latest[0]):     # iter trên neighbors'subject, với i là từng query trong batch đó
             mask = (neighbors_latest[0][i] != -1)  # filter out the '-1' terms when we cannot sample same number of neighors as num_neighbors
             ngh_emb_cur.append(self.get_node_emb(neighbors_latest[0][i][mask], neighbors_latest[2][i][mask],
                                                  [ts_idx_all[-2][i]] * len(neighbors_latest[0][i][mask])))  # get node embedding (ent, ts)
@@ -195,22 +201,22 @@ class TARGCN(nn.Module):
             ngh_rel_emb.append(ngh_rel_emb_cur)
             ngh_emb_cur, ngh_rel_emb_cur, ngh_emb_cur_ = [], [], []
 
-        for i in range(batch.src_idx.shape[0]):
-            ngh_emb_, ngh_rel_emb_ = ngh_emb[-1][i], ngh_rel_emb[-1][i]
+        for i in range(batch.src_idx.shape[0]):     # với mỗi neighbor 
+            ngh_emb_, ngh_rel_emb_ = ngh_emb[-1][i], ngh_rel_emb[-1][i]     # -1: lấy step mới nhất, i: của batch đang duyệt
             if ngh_emb_.shape[0] == 0:  # have not get node embedding yet
                 sub_emb = self.get_node_emb(np.array([batch.src_idx[i]]).astype(np.int32),
                                             np.zeros((1,)).astype(np.int32), np.zeros((1,)).astype(np.int32))
                 sub_emb = torch.sum(sub_emb, dim=0)
                 sub_emb = sub_emb.tanh()
             else:
-                sub_emb = self.neighbor_encoder(ngh_emb_, ngh_rel_emb_)
+                sub_emb = self.neighbor_encoder(ngh_emb_, ngh_rel_emb_)     
 
-            sub_emb_all.append(sub_emb)
+            sub_emb_all.append(sub_emb)                                     # sub emb cho batch đó
 
         sub_emb_all = torch.stack(sub_emb_all, dim=0)
 
         if self.decoder.lower() == 'distmult':
-            score = self.Distmult(sub_emb_all, batch)
+            score = self.Distmult(sub_emb_all, batch)                       # [128, 7128]
         elif self.decoder.lower() == 'bique':
             score = self.BiQUE(sub_emb_all, batch)
 

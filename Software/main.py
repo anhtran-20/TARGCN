@@ -14,7 +14,7 @@ from tqdm import tqdm
 class SimpleCustomBatch:
     def __init__(self, data):
         # print(data)
-        transposed_data = list(zip(*data))
+        transposed_data = list(zip(*data))      # 4 elements (s,o,r,t)
         self.src_idx = np.array(transposed_data[0], dtype=np.int32)
         self.rel_idx = np.array(transposed_data[1], dtype=np.int32)
         self.target_idx = np.array(transposed_data[2], dtype=np.int32)
@@ -94,7 +94,8 @@ if __name__ == '__main__':
     parser.add_argument('--step', type=int, default=1)
 
     args = parser.parse_args()
-    if not args.resume: args.name = args.name + '_' + time.strftime('%Y_%m_%d') + '_' + time.strftime('%H:%M:%S')
+    if not args.resume: 
+        args.name = args.name + '_' + time.strftime('%Y_%m_%d') + '_' + time.strftime('%H_%M_%S')
 
     logger = setup_logger(args.name)
 
@@ -174,7 +175,7 @@ if __name__ == '__main__':
 
     # optimizer
     optim = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    lr = args.lr
+    lr = args.lr    #0.001
 
     # whether to load model
     best_val_mrr = 0
@@ -189,11 +190,11 @@ if __name__ == '__main__':
             batch_num = 0
 
             t_train_start = time.time()
-            model.nf.set_adj(adj)
+            model.nf.set_adj(adj)                   #adj: o2srt_train
             for batch in tqdm(train_data_loader):
                 optim.zero_grad()
                 model.train()
-                score = model(batch, num_neighbors=args.num_neighbors)
+                score = model(batch, num_neighbors=args.num_neighbors)  #args.num_neighbors = 100, forward trong TARGCN (emb...) và return score = Distmult cuối cùng cho batch
                 loss = model.loss(score, torch.tensor(batch.target_idx, dtype=torch.long, device=device))
 
                 loss.backward()
@@ -201,7 +202,7 @@ if __name__ == '__main__':
 
                 running_loss += loss.item()
                 batch_num += 1
-
+            model.save('TARGCN_MA.h5')
             running_loss /= batch_num
             t_train_end = time.time()
 
@@ -212,6 +213,7 @@ if __name__ == '__main__':
             # validation
             if (epoch + 1) % args.test_step == 0:
                 # model.nf.set_adj(adj_test)
+
                 results = predict(val_loader, model, args, num_entities, sr2o, srt2o, logger)
 
                 print("===========RAW===========")

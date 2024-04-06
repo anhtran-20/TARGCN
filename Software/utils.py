@@ -94,9 +94,9 @@ class NeighborFinder:
         self.adj = adj
 
     def get_temporal_neighbor(self, obj_idx_l, ts_l, num_neighbors=20):
-        assert (len(obj_idx_l) == len(ts_l))
+        assert (len(obj_idx_l) == len(ts_l))    # len = batch_size = 128
 
-        out_ngh_node_batch = -np.ones((len(obj_idx_l), num_neighbors)).astype(np.int32)
+        out_ngh_node_batch = -np.ones((len(obj_idx_l), num_neighbors)).astype(np.int32)     # (128, 100)
         out_ngh_t_batch = np.zeros((len(obj_idx_l), num_neighbors)).astype(np.int32)
         out_ngh_eidx_batch = -np.ones((len(obj_idx_l), num_neighbors)).astype(np.int32)
         offset_l = []
@@ -106,22 +106,22 @@ class NeighborFinder:
             full_ngh_node = []
             full_ngh_t = []
             full_ngh_edge = []
-        for i, (obj_idx, cut_time) in enumerate(zip(obj_idx_l, ts_l)):
+        for i, (obj_idx, cut_time) in enumerate(zip(obj_idx_l, ts_l)):          # lấy được <= 100 temporal neighbors của cặp (s_q, t_q) đó
             if i == 0:
                 been_through = 0  # a variable to track offset
 
-            srt_l = self.adj[obj_idx]
+            srt_l = self.adj[obj_idx]       # những query có obj là obj_idx
             got_node_emb_l.append(0)
             if len(srt_l) == 0:
                 offset_l.append([been_through, been_through])
                 continue
 
-            ngh_idx = np.array(srt_l).transpose()[0]
+            ngh_idx = np.array(srt_l).transpose()[0]        #lấy ra từ những query có obj đó (subject, relation, time)
             ngh_eidx = np.array(srt_l).transpose()[1]
             ngh_ts = np.array(srt_l).transpose()[2]
 
             if len(ngh_idx) > 0:
-                if self.sampling == 0:
+                if self.sampling == 0:                      # lấy random
                     sampled_idx = np.random.randint(0, len(ngh_idx), num_neighbors)
 
                     sampled_idx = np.sort(sampled_idx)
@@ -130,14 +130,14 @@ class NeighborFinder:
                     out_ngh_t_batch[i, :] = ngh_ts[sampled_idx]
                     out_ngh_eidx_batch[i, :] = ngh_eidx[sampled_idx]
 
-                elif self.sampling == 1:
+                elif self.sampling == 1:                    #lấy 100 cái đầu
                     ngh_ts = ngh_ts[:num_neighbors]
                     ngh_idx = ngh_idx[:num_neighbors]
                     ngh_eidx = ngh_eidx[:num_neighbors]
                     out_ngh_node_batch[i, num_neighbors - len(ngh_idx):] = ngh_idx
                     out_ngh_t_batch[i, num_neighbors - len(ngh_ts):] = ngh_ts
                     out_ngh_eidx_batch[i, num_neighbors - len(ngh_eidx):] = ngh_eidx
-                elif self.sampling == 2:
+                elif self.sampling == 2:                    # lấy 100 cái cuối
                     ngh_ts = ngh_ts[-num_neighbors:]
                     ngh_idx = ngh_idx[-num_neighbors:]
                     ngh_eidx = ngh_eidx[-num_neighbors:]
@@ -146,24 +146,24 @@ class NeighborFinder:
                     out_ngh_eidx_batch[i, num_neighbors - len(ngh_eidx):] = ngh_eidx
                 elif self.sampling == 3:
                     delta_t = (-abs(ngh_ts - cut_time)) / (self.time_granularity * self.weight_factor)
-                    weights = np.exp(delta_t) + 1e-9
-                    weights = weights / sum(weights)
+                    weights = np.exp(delta_t) + 1e-9    
+                    weights = weights / sum(weights)        # xác suất để lấy entity đó bỏ vào subgraph
 
-                    if len(ngh_idx) >= num_neighbors:
-                        sampled_idx = np.random.choice(len(ngh_idx), num_neighbors, replace=False, p=weights)
-                    else:
-                        sampled_idx = np.random.choice(len(ngh_idx), len(ngh_idx), replace=False, p=weights)
-
+                    if len(ngh_idx) >= num_neighbors:       # chọn ra indx của những neighbor được chọn
+                        sampled_idx = np.random.choice(len(ngh_idx), num_neighbors, replace=False, p=weights)   # giống shuffle lấy index của ent, nhưng có theo xác suất weights, replace = False là mỗi ele chỉ được chọn 1 lần
+                    else:                                                                                       # nhưng chỉ có nghĩa khi len(ngh_idx) > num_neighbors
+                        sampled_idx = np.random.choice(len(ngh_idx), len(ngh_idx), replace=False, p=weights)    # ít hơn num_neighbors thì cứ lấy hết
+                                                                                                                
                     sampled_idx = np.sort(sampled_idx)
-                    out_ngh_node_batch[i, num_neighbors - len(sampled_idx):] = ngh_idx[sampled_idx]
+                    out_ngh_node_batch[i, num_neighbors - len(sampled_idx):] = ngh_idx[sampled_idx]             # lắp vào phía đuôi 
                     out_ngh_t_batch[i, num_neighbors - len(sampled_idx):] = ngh_ts[sampled_idx]
                     out_ngh_eidx_batch[i, num_neighbors - len(sampled_idx):] = ngh_eidx[sampled_idx]
 
-                    if (num_neighbors - len(sampled_idx)) != 0:
+                    if (num_neighbors - len(sampled_idx)) != 0:     # nếu số lượng node đc lấy nhỏ hơn num_neighbors
                         offset_l.append([been_through, been_through + len(sampled_idx)])
                         been_through += len(sampled_idx)
                     else:
-                        offset_l.append([been_through, been_through + num_neighbors])
+                        offset_l.append([been_through, been_through + num_neighbors])               # offset_l = [[0,49],]
                         been_through += num_neighbors
 
                 elif self.sampling == 4:
