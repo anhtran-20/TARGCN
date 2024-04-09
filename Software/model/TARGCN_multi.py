@@ -120,15 +120,18 @@ class TARGCN(nn.Module):
 
     def get_node_emb(self, ngh_idx_l, ngh_time_l, former_ts_idx): #self.get_node_emb(neighbors_latest[0][i][mask], neighbors_latest[2][i][mask], [ts_idx_all[-2][i]] * len(neighbors_latest[0][i][mask]))
         hidden_node = self.get_ent_emb(ngh_idx_l)       # dùng distmult                                 #size (49,300)
+        if hidden_node.nelement() == 0: 
+            return torch.empty(0, self.embed_dim).to(device='cuda')
         if self.use_time_embedding:                         #    self.get_node_emb(np.arange(self.num_ent), np.zeros((self.num_ent,)).astype(np.int32), np.zeros((self.num_ent,)).astype(np.int32))
             cut_time_l = ngh_time_l - former_ts_idx
             hidden_time = self.time_encoder(torch.from_numpy(cut_time_l[:, np.newaxis]).to(self.device)) #size (49, 1, 300)
             # return self.node_emb_proj(torch.cat([hidden_node, torch.squeeze(hidden_time, 1)], axis=1))
-            # if (torch.cat([hidden_node, torch.squeeze(hidden_time, 1)], axis=1)).dtype == torch.double:
-            #     print('DOUBLE!')
-            #     print(hidden_node)
-            #     print(torch.squeeze(hidden_time, 1))
-            # else: print((torch.cat([hidden_node, torch.squeeze(hidden_time, 1)], axis=1)).dtype )
+            if (torch.cat([hidden_node, torch.squeeze(hidden_time, 1)], axis=1)).dtype == torch.double:
+                print('DOUBLE!')
+                print(hidden_node)
+                print(torch.squeeze(hidden_time, 1))
+                print((torch.cat([hidden_node, torch.squeeze(hidden_time, 1)], axis=1)).dtype)
+                return torch.zeros(1, self.embed_dim)
             return self.node_emb_proj(torch.cat([hidden_node, torch.squeeze(hidden_time, 1)], axis=1))  # (...) có size (49,600)
         else:
             return self.node_emb_proj(hidden_node)

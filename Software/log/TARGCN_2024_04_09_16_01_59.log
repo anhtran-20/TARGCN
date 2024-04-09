@@ -1,0 +1,2 @@
+04-09 16:01 TARGCN_2024_04_09_16_01_59 INFO     {'score_func': 'distmult', 'num_epoch': 100, 'batch_size': 2048, 'embsize': 300, 'test_step': 1, 'test': False, 'lr': 0.001, 'lr_decay_step': 30, 'gamma': 0.8, 'weight_decay': 0.0, 'device': 'cuda:0', 'dataset': 'ICEWS14', 'dropout': 0.3, 'shuffle': True, 'resume': False, 'name': 'TARGCN_2024_04_09_16_01_59', 'activation': 'relu', 'weight_factor': 2, 'seed': 0, 'num_neighbors': 100, 'step': 1}
+04-09 16:02 TARGCN_2024_04_09_16_01_59 INFO     Epoch 1: 17.03608512878418 Time: 0.8996562957763672

@@ -71,8 +71,10 @@ if __name__ == '__main__':
     modelpth = './checkpoints/'
     parser = argparse.ArgumentParser(description='TARGCN')
     parser.add_argument('--score_func', type=str, default='distmult', help='score function')
-    parser.add_argument('--num_epoch', type=int, default=100, help='number of maximum epoch')
-    parser.add_argument('--batch_size', type=int, default=128, help='number of examples in a batch')
+    # parser.add_argument('--num_epoch', type=int, default=100, help='number of maximum epoch')
+    # parser.add_argument('--batch_size', type=int, default=128, help='number of examples in a batch')
+    parser.add_argument('--num_epoch', type=int, default=10, help='number of maximum epoch')
+    parser.add_argument('--batch_size', type=int, default=2048, help='number of examples in a batch')
     parser.add_argument('--embsize', type=int, default=300, help='size of output embeddings')
     parser.add_argument('--test_step', type=int, default=1, help='test every test_step epoch')
     parser.add_argument('--test', action='store_true', help='whether testing or not')
@@ -202,7 +204,7 @@ if __name__ == '__main__':
 
                 running_loss += loss.item()
                 batch_num += 1
-            model.save('TARGCN_MA.h5')
+            # model.save('TARGCN_MA.h5')
             running_loss /= batch_num
             t_train_end = time.time()
 
